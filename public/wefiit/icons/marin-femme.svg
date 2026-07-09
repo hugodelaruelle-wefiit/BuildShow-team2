@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <filter id="hand-f" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="3" result="n"></feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="3.4" xChannelSelector="R" yChannelSelector="G"></feDisplacementMap>
+    </filter>
+  </defs>
+  
+  <g filter="url(#hand-f)" fill="#002882">
+    <path d="M92,80 C83,105 85,131 98,144 C92,127 92,104 101,90 C97,86 93,82 92,80 Z"></path>
+    <path d="M164,80 C173,105 171,131 158,144 C164,127 164,104 155,90 C159,86 163,82 164,80 Z"></path>
+  </g>
+  <g filter="url(#hand-f)" fill="none" stroke="#002882" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    
+    <path d="M131,45 C151,45 168,61 167,82 C166,104 149,121 126,121 C103,120 89,103 90,82 C91,62 107,46 131,45 C133,45 136,46 139,48"></path>
+    
+    <path d="M110,119 C111,131 105,137 95,142 C76,151 63,171 61,207 L195,206 C193,170 180,150 161,142 C151,137 145,131 146,118"></path>
+  </g>
+  
+  <g filter="url(#hand-f)" fill="#002882">
+    <path d="M88,83 C83,52 105,37 128,37 C152,38 173,52 168,83 C159,65 145,57 128,57 C110,57 96,65 88,83 Z"></path>
+  </g>
+  <g filter="url(#hand-f)" fill="none" stroke="#002882" stroke-width="12.5" stroke-linecap="round">
+    <path d="M88,154 C112,151 144,151 168,153"></path>
+    <path d="M78,174 C108,177 150,170 178,174"></path>
+    <path d="M70,193 C106,189 152,196 186,192"></path>
+  </g>
+</svg>

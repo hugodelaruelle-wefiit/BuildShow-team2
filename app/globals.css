@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@import "./wefiit.css";
+
+/* ============================================================
+   WeFiiT tokens → Tailwind v4 theme
+   Maps the design-system variables (defined in wefiit.css) onto
+   Tailwind utilities: bg-marine, text-electrique, rounded-pill,
+   font-sans (Geomanist), shadow-md, etc.
+   ============================================================ */
+@theme {
+  /* Brand */
+  --color-marine: #002882;
+  --color-marine-900: #001d84;
+  --color-marine-800: #002782;
+  --color-electrique: #0042ff;
+  --color-orange: #f98f03;
+  --color-braise: #e8572a;
+
+  /* Secondary */
+  --color-violet: #380066;
+  --color-lilas: #e6d9f5;
+  --color-lavande: #c8d6ff;
+  --color-jade: #6abfa3;
+  --color-foret: #1a4d3e;
+  --color-jade-clair: #e8f7f2;
+
+  /* Base & neutrals */
+  --color-creme: #fbf2e9;
+  --color-glace: #f2f5ff;
+  --color-blanc: #ffffff;
+  --color-petrole: #0e2a3a;
+
+  /* Semantic text */
+  --color-fg: #002882;
+  --color-fg-2: #3a4a6b;
+  --color-fg-muted: #6b7793;
+
+  /* Functional */
+  --color-alerte: #e53935;
+  --color-succes: #1db954;
+  --color-avertissement: #f59e0b;
+
+  /* Borders */
+  --color-border-white: #eceef5;
+  --color-border-cream: #e4dace;
+
+  /* Fonts */
+  --font-sans: "Geomanist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Geomanist", system-ui, sans-serif;
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  /* Elevation — soft, navy-tinted */
+  --shadow-sm: 0 1px 2px rgba(0, 40, 130, 0.06), 0 1px 3px rgba(0, 40, 130, 0.08);
+  --shadow-md: 0 6px 18px rgba(0, 40, 130, 0.1);
+  --shadow-lg: 0 18px 48px rgba(0, 40, 130, 0.14);
+}
+
+/* ============================================================
+   Base — white ground, navy text, Geomanist everywhere
+   ============================================================ */
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
