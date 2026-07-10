@@ -38,6 +38,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             {email && (
               <>
+                <Link
+                  href="/sessions"
+                  className="wf-sm font-medium text-fg transition-colors hover:text-electrique"
+                >
+                  Mes sessions
+                </Link>
                 <span className="wf-sm text-fg-muted">{email}</span>
                 <form action="/auth/signout" method="post">
                   <button

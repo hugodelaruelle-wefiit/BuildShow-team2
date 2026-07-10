@@ -204,22 +204,27 @@
 
 ## Phase 5 — Persistance & finitions (~15 min)
 
-### Étape 5.1 — Schéma Supabase
+### Étape 5.1 — Schéma Supabase — ✅ FAIT
 - **Objectif** : créer les tables + RLS.
-- **Actions** :
-  - Migration SQL : tables `sessions` et `questions_generated` (cf. SPEC).
-  - **RLS** : chaque user ne lit/écrit que ses propres sessions (`auth.uid() = user_id`).
-- **Fichiers** : `supabase/migrations/0001_init.sql`.
-- **Done when** : les tables existent, RLS activée, un user ne voit que ses sessions.
+- **Actions réalisées** :
+  - Migrations SQL : `0001_init.sql` (`sessions` + RLS `auth.uid() = user_id`), `0002_pitch_qa.sql` (`pitch_transcript` + table `questions_generated` avec RLS par appartenance à la session), `0003_debrief.sql` (colonnes `feedback_summary`, `debrief_full`, `pitch_recommended_json`, `pitch_recommended_full_text`).
+  - **RLS** : chaque user ne lit/écrit que ses propres sessions ; les questions héritent via jointure sur `sessions.user_id`.
+- **Fichiers** : `supabase/migrations/0001_init.sql`, `0002_pitch_qa.sql`, `0003_debrief.sql`.
+- **Done when** : ✅ les tables existent, RLS activée, un user ne voit que ses sessions.
 
-### Étape 5.2 — État & navigation de session
-- **Objectif** : parcours fluide new → pitch → qa → debrief.
-- **Actions** : routing par `session.id`, garde-fous si étape précédente incomplète, écrans de chargement pendant les appels Claude.
-- **Done when** : le parcours complet s'enchaîne sans état incohérent.
+### Étape 5.2 — État & navigation de session — ✅ FAIT
+- **Objectif** : parcours fluide new → pitch → qa → debrief, + retrouver ses sessions.
+- **Actions réalisées** :
+  - Routing par `session.id` ; **garde-fous serveur** sur chaque écran : auth (redirige vers `/login?redirect=…`), appartenance de la session (`notFound` sinon), étape précédente incomplète (`qa` sans questions → `pitch` ; `debrief` sans `pitch_transcript` ou sans questions → `pitch`).
+  - **Écrans de chargement** pendant les appels Claude (bouton « Le client prépare ses questions… » sur le pitch ; lignes de chargement débrief + pitch recommandé, avec bouton *Réessayer* en cas d'échec).
+  - **Historique de sessions** (`/sessions`, DoD #6) : liste triée par date, statut (Débrief prêt / En cours / À démarrer) et lien profond vers la bonne étape selon l'avancement. Lien « Mes sessions » ajouté au header quand connecté.
+- **Fichiers** : `app/sessions/page.tsx`, `components/AppShell.tsx` (+ garde-fous dans `app/session/[id]/{pitch,qa,debrief}/page.tsx`, déjà en place).
+- **Done when** : ✅ le parcours complet s'enchaîne sans état incohérent et l'utilisateur retrouve ses sessions persistées.
 
-### Étape 5.3 — Déploiement Vercel
+### Étape 5.3 — Déploiement Vercel — ⏳ À FAIRE (côté utilisateur)
 - **Objectif** : mettre en ligne.
-- **Actions** : lier le repo GitHub, configurer les env vars sur Vercel, mettre à jour la redirect URL Azure/Supabase avec le domaine prod.
+- **Actions** : lier le repo GitHub, configurer les env vars sur Vercel (`ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — cf. `.env.example`), mettre à jour la redirect URL Azure/Supabase avec le domaine prod.
+- **Bloqué par** : accès Vercel + clé Anthropic (non disponible pour l'instant). Le code est prêt (typecheck + lint OK).
 - **Done when** : la démo tourne sur l'URL Vercel avec login SSO fonctionnel.
 
 ---
