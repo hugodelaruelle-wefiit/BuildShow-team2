@@ -6,13 +6,13 @@
 
 | Sujet | Choix V1 |
 |-------|----------|
-| **Voix** | Web Speech API navigateur — STT pour capter le pitch/réponses, TTS pour faire "parler" le client. Le transcript **texte** est envoyé à Claude (pas d'audio). |
+| **Voix** | Web Speech API navigateur — STT pour capter le pitch/réponses, TTS pour faire "parler" le client. Le transcript **texte** est envoyé à Claude (pas d'audio). Dictée live sur **Chrome, Edge et Safari** ; sur les navigateurs sans STT (Firefox), repli **saisie/collage** dans une zone de texte (toujours présente et éditable). |
 | **Interaction** | **Turn-based** : pitch complet → valider → 3 questions posées une par une → débrief. |
 | **Frontend** | Next.js (App Router) + TypeScript + Tailwind. |
 | **Backend** | API routes Next.js (`/app/api/...`) — la clé Claude reste **côté serveur**. |
 | **IA** | Claude API (Messages), modèle `claude-sonnet-5` par défaut. |
 | **Persistance** | Supabase (PostgreSQL) — tables `sessions` + `questions_generated`. |
-| **Auth** | **V1 : magic-link e-mail Supabase**, restreint aux adresses `@wefiit.com`. SSO **Microsoft 365 / Azure AD** = cible **reportée** (droits Azure indisponibles au build) — voir Phase 1. |
+| **Auth** | **SSO Microsoft 365 / Azure AD** (chemin principal, single-tenant WeFiiT) + **magic-link e-mail Supabase** en secours, restreint aux adresses `@wefiit.com` — voir Phase 1. |
 | **Déploiement** | Vercel. |
 | **Sources froides** | `guide-prepa-soutenance.md` + `critères-pitch.md` chargés côté serveur et injectés dans le prompt système. |
 | **Design System** | **Design System WeFiiT obligatoire** — dossier `Design System - WeFiiT 1`. Toute l'UI suit la charte de marque (couleurs, typo Geomanist, composants). |
@@ -74,9 +74,11 @@
 
 ---
 
-## Phase 1 — Auth WeFiiT (~15 min) — ✅ FAIT (magic-link)
+## Phase 1 — Auth WeFiiT (~15 min) — ✅ FAIT (SSO Azure + magic-link)
 
-> **🔁 Décision revue (2026-07-10)** : le SSO Microsoft/Azure est **reporté** (droits Azure indisponibles au moment du build). La V1 s'authentifie via **magic-link e-mail Supabase**, restreint aux adresses `@wefiit.com`. Le fallback prévu au plan est devenu le chemin V1. Le code de garde de route et le callback sont **agnostiques du provider** → rebrancher Azure ne touchera que la page login et la config Supabase/Azure.
+> **🔁 Historique de décision** :
+> - *2026-07-10 (build)* : SSO Microsoft/Azure **reporté** faute de droits Azure ; la V1 démarre sur **magic-link e-mail Supabase**. Code de garde de route et callback écrits **agnostiques du provider** dès le départ.
+> - *2026-07-10 (activation)* : droits Azure obtenus → **SSO Microsoft 365 / Azure activé** et testé OK en local (localhost:3000). C'est désormais le **chemin principal** ; le magic-link est **conservé en secours**. La bascule n'a touché que `app/login/page.tsx` (ajout du bouton) — `proxy.ts`, callback et clients Supabase inchangés, comme prévu.
 >
 > **⚠️ Note Next.js 16** : le fichier `middleware.ts` est renommé **`proxy.ts`** (fonction exportée `proxy`). C'est la convention utilisée ici.
 
@@ -98,14 +100,15 @@
 - **Fichiers** : `app/login/page.tsx`, `proxy.ts`, `lib/supabase/proxy.ts`, `app/auth/callback/route.ts`, `app/auth/signout/route.ts`, `components/AppShell.tsx`.
 - **Done when** : ✅ un compte `@wefiit.com` reçoit un lien, se connecte et atteint `/` ; une adresse externe est refusée avant envoi et re-bloquée au callback. (Garde de route testée : `/` et `/session/new` → `/login` ; `/login` → 200.)
 
-### Étape 1.3 — (Reporté) SSO Microsoft / Azure — 🔜 post-V1
-- **Objectif** : remplacer le magic-link par le SSO Entra ID quand les droits Azure sont dispo.
-- **Actions** :
-  - App registration Azure (single-tenant WeFiiT), redirect URL Supabase, secret.
-  - Activer le provider **Azure** dans Supabase (client ID + secret + tenant).
-  - Page login : bouton "Se connecter avec Microsoft" → `signInWithOAuth({ provider: 'azure' })`.
-- **Fichiers impactés** : `app/login/page.tsx` (uniquement) + config Supabase/Azure. `proxy.ts`, `lib/supabase/server.ts` et le callback restent inchangés (déjà agnostiques).
-- **Done when** : un compte `@wefiit.com` se connecte via Microsoft, un compte externe est refusé par le tenant.
+### Étape 1.3 — SSO Microsoft / Azure — ✅ FAIT
+- **Objectif** : SSO Entra ID comme chemin de connexion principal, magic-link conservé en secours.
+- **Actions réalisées** :
+  - App registration Azure **single-tenant WeFiiT**, redirect URI `<supabase-url>/auth/v1/callback`, client secret généré.
+  - Provider **Azure** activé dans Supabase (client ID + secret + Tenant URL `https://login.microsoftonline.com/<tenant-id>`).
+  - Page login : bouton "Se connecter avec Microsoft" → `signInWithOAuth({ provider: 'azure', options: { redirectTo, scopes: 'email' } })`, magic-link passé en secondaire.
+- **Fichiers impactés** : `app/login/page.tsx` (uniquement) + config Supabase/Azure. `proxy.ts`, `lib/supabase/server.ts` et le callback inchangés (déjà agnostiques ; le callback gérait déjà `?code=` PKCE).
+- **Done when** : ✅ un compte `@wefiit.com` se connecte via Microsoft (testé en local, localhost:3000) ; un compte externe est refusé par le tenant single-tenant.
+- **Reste pour la prod** : ajouter le domaine Vercel dans Supabase → Authentication → URL Configuration (redirect URLs) lors du déploiement (Étape 5.3).
 
 ---
 
@@ -134,7 +137,7 @@
 - **Actions** :
   - `useSpeechRecognition` : wrapper `SpeechRecognition` (fr-FR, `continuous`, `interimResults`) → renvoie transcript live + final.
   - `useSpeechSynthesis` : `speechSynthesis.speak()` pour lire les questions du client (voix fr).
-  - Gérer la compat navigateur (Chrome recommandé — afficher un avertissement sinon).
+  - Gérer la compat navigateur : dictée live sur Chrome/Edge/Safari ; sur les navigateurs sans STT (Firefox), afficher un encart neutre invitant à saisir/coller le texte (la zone de texte reste toujours disponible). Détection via `useSyncExternalStore` (SSR-safe, pas de mismatch d'hydratation).
 - **Fichiers** : `hooks/useSpeechRecognition.ts`, `hooks/useSpeechSynthesis.ts`.
 - **Done when** : parler affiche le transcript en direct ; un texte de test est lu à voix haute.
 
@@ -224,7 +227,7 @@
 ## ✅ Definition of Done (V1)
 
 Un WeFiiTer `@wefiit.com` peut, de bout en bout :
-1. Se connecter via **magic-link e-mail** (SSO Microsoft reporté post-V1).
+1. Se connecter via **SSO Microsoft 365 / Azure** (magic-link e-mail conservé en secours).
 2. Coller son brief + la spec client et démarrer une session.
 3. Pitcher à voix haute (transcrit en direct).
 4. Répondre oralement à 3 questions d'un client sceptique.
@@ -237,7 +240,6 @@ Un WeFiiTer `@wefiit.com` peut, de bout en bout :
 
 ## 🔭 Hors scope V1 (backlog V2)
 
-- **SSO Microsoft 365 / Azure AD** (remplace le magic-link — cf. Étape 1.3).
 - Upload/parsing PDF du brief et de la spec.
 - Conversation vocale temps réel (interruptions, streaming).
 - Transcription haute fidélité (Whisper / audio natif Claude).
@@ -252,8 +254,8 @@ Un WeFiiTer `@wefiit.com` peut, de bout en bout :
 
 | Risque | Mitigation |
 |--------|------------|
-| Web Speech API limité hors Chrome | Détecter le navigateur, recommander Chrome, prévoir saisie texte de secours. |
-| Setup Azure SSO long | ✅ Traité : V1 sur **magic-link Supabase** ; Azure reporté post-V1 (Étape 1.3). Limite e-mail intégré Supabase ~3-4/h + risque spam → OK pour démo. |
+| Web Speech API (STT) absente sur Firefox | ✅ Traité : dictée live sur Chrome/Edge/Safari ; repli **saisie/collage** (zone de texte toujours présente) sur les autres navigateurs, avec message dédié. Bascule serveur (Whisper/Deepgram) possible plus tard sans refonte si Firefox devient un besoin. |
+| Setup Azure SSO long | ✅ Traité : **SSO Azure activé** (Étape 1.3), testé OK en local. Magic-link Supabase conservé en secours (limite e-mail intégré ~3-4/h + risque spam → OK pour démo si besoin de repli). |
 | Latence Claude (questions/débrief) | Écrans de chargement + `claude-sonnet-5` ; streaming en option. |
 | Clé Claude exposée | Tous les appels Claude via API routes serveur, jamais côté client. |
 | Accents fr / transcription imparfaite | Langue `fr-FR`, transcript éditable avant validation. |
