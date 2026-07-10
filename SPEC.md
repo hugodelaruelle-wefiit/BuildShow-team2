@@ -155,6 +155,17 @@ Pour chaque session d'entraînement, le WeFiiTer fournit **deux documents contex
 
 ---
 
+## 🔐 Authentification & Accès
+
+Accès **réservé aux WeFiiTers** (`@wefiit.com`).
+
+- **V1 (implémenté)** : **magic-link e-mail Supabase**. Le WeFiiTer saisit son adresse `@wefiit.com` et reçoit un lien de connexion à usage unique. Le domaine est vérifié côté client (avant envoi) **et** côté serveur (au callback, avec `signOut` si non conforme).
+- **Garde de route** : `proxy.ts` (Next.js 16 — ex-`middleware`) redirige tout non-authentifié vers `/login` en conservant la destination.
+- **Reporté post-V1** : **SSO Microsoft 365 / Azure AD** (droits Azure indisponibles au build). Le code auth est agnostique du provider — la bascule ne touchera que la page login et la config Supabase/Azure.
+- **Secrets** : clé service-role et `ANTHROPIC_API_KEY` restent **côté serveur** uniquement ; le client n'utilise que l'anon key publique.
+
+---
+
 ## 💾 Données Persistantes (Supabase)
 
 ### Schema de Session
@@ -205,6 +216,7 @@ CREATE TABLE questions_generated (
 | Layer | Tech | Role |
 |-------|------|------|
 | **Frontend** | React / Next.js | Interface vocal, upload documents, affichage débrief |
+| **Auth** | Supabase Auth — **magic-link e-mail** (V1), restreint `@wefiit.com` | Connexion réservée aux WeFiiTers ; SSO Azure reporté post-V1 |
 | **Orchestration IA** | Claude API (Messages) | Prompt système, génération questions, débrief |
 | **Audio** | Web Audio API / Whisper (OpenAI) | Enregistrement + transcription vocal |
 | **Persistence** | Supabase (PostgreSQL) | Sessions, transcripts, feedback historique |
@@ -246,6 +258,7 @@ CREATE TABLE questions_generated (
 | `guide-prepa-soutenance.md` | ❌ À créer | Source froide #1 — contenu corporate WeFiiT |
 | `critères-pitch.md` | ✅ Existant | Source froide #2 — grille d'évaluation |
 | `SPEC.md` | ✅ Créé | Ce document |
+| Auth (magic-link + garde de route) | ✅ Codé | `lib/supabase/*`, `proxy.ts`, `app/login`, `app/auth/*` — Azure SSO reporté post-V1 |
 | Frontend (React/Next.js) | ❌ À coder | Setup form + audio recorder + débrief display |
 | Claude API Integration | ❌ À coder | Prompt système + generation questions + débrief |
 | Supabase Schema | ❌ À coder | Tables sessions + questions_generated |

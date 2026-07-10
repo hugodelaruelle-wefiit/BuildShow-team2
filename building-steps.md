@@ -12,7 +12,7 @@
 | **Backend** | API routes Next.js (`/app/api/...`) — la clé Claude reste **côté serveur**. |
 | **IA** | Claude API (Messages), modèle `claude-sonnet-5` par défaut. |
 | **Persistance** | Supabase (PostgreSQL) — tables `sessions` + `questions_generated`. |
-| **Auth** | SSO **Microsoft 365 / Azure AD** via Supabase Auth, restreint au tenant `@wefiit.com`. |
+| **Auth** | **V1 : magic-link e-mail Supabase**, restreint aux adresses `@wefiit.com`. SSO **Microsoft 365 / Azure AD** = cible **reportée** (droits Azure indisponibles au build) — voir Phase 1. |
 | **Déploiement** | Vercel. |
 | **Sources froides** | `guide-prepa-soutenance.md` + `critères-pitch.md` chargés côté serveur et injectés dans le prompt système. |
 | **Design System** | **Design System WeFiiT obligatoire** — dossier `Design System - WeFiiT 1`. Toute l'UI suit la charte de marque (couleurs, typo Geomanist, composants). |
@@ -74,26 +74,38 @@
 
 ---
 
-## Phase 1 — Auth SSO WeFiiT (~15 min)
+## Phase 1 — Auth WeFiiT (~15 min) — ✅ FAIT (magic-link)
 
-### Étape 1.1 — Config Supabase Auth + Azure
-- **Objectif** : login Microsoft 365 restreint à WeFiiT.
+> **🔁 Décision revue (2026-07-10)** : le SSO Microsoft/Azure est **reporté** (droits Azure indisponibles au moment du build). La V1 s'authentifie via **magic-link e-mail Supabase**, restreint aux adresses `@wefiit.com`. Le fallback prévu au plan est devenu le chemin V1. Le code de garde de route et le callback sont **agnostiques du provider** → rebrancher Azure ne touchera que la page login et la config Supabase/Azure.
+>
+> **⚠️ Note Next.js 16** : le fichier `middleware.ts` est renommé **`proxy.ts`** (fonction exportée `proxy`). C'est la convention utilisée ici.
+
+### Étape 1.1 — Clients Supabase ✅
+- **Objectif** : accès Supabase côté navigateur et serveur, clé service-role jamais exposée.
 - **Actions** :
-  - Créer le projet Supabase, activer le provider **Azure** (Entra ID) : App registration côté Azure, redirect URL Supabase, restreindre au tenant WeFiiT.
-  - Clients Supabase : `lib/supabase/client.ts` (browser) + `lib/supabase/server.ts` (server, cookies via `@supabase/ssr`).
+  - `lib/supabase/client.ts` (browser, `createBrowserClient`, anon key uniquement).
+  - `lib/supabase/server.ts` (server, cookies via `@supabase/ssr`, `cookies()` **async** en Next 16).
 - **Fichiers** : `lib/supabase/client.ts`, `lib/supabase/server.ts`.
-- **Done when** : la config Azure est enregistrée dans Supabase.
+- **Done when** : ✅ les deux clients compilent et lisent la session via cookies.
 
-### Étape 1.2 — Flux login + garde de route
-- **Objectif** : protéger l'app.
+### Étape 1.2 — Flux login magic-link + garde de route ✅
+- **Objectif** : protéger l'app, connexion réservée à `@wefiit.com`.
 - **Actions** :
-  - Page/bouton "Se connecter avec Microsoft" → `signInWithOAuth({ provider: 'azure' })`.
-  - `middleware.ts` : redirige les non-authentifiés vers `/login`.
-  - Vérifier le domaine `@wefiit.com` (côté callback ou politique Azure).
-- **Fichiers** : `app/login/page.tsx`, `middleware.ts`, `app/auth/callback/route.ts`.
-- **Done when** : un compte `@wefiit.com` se connecte et atteint `/`, un compte externe est refusé.
+  - Page login : saisie e-mail → `signInWithOtp({ email, options: { emailRedirectTo } })`. Domaine `@wefiit.com` vérifié **avant l'envoi**.
+  - `proxy.ts` (+ helper `lib/supabase/proxy.ts`) : rafraîchit la session et redirige les non-authentifiés vers `/login` (conserve la destination dans `?redirect=`). No-op propre si Supabase non configuré.
+  - `app/auth/callback/route.ts` : établit la session (gère `?code=` PKCE **et** `?token_hash=`), **re-vérifie `@wefiit.com`** côté serveur (sinon `signOut` + retour login), protège contre les open-redirects.
+  - Bonus : `app/auth/signout/route.ts` + e-mail connecté affiché dans `AppShell` (header).
+- **Fichiers** : `app/login/page.tsx`, `proxy.ts`, `lib/supabase/proxy.ts`, `app/auth/callback/route.ts`, `app/auth/signout/route.ts`, `components/AppShell.tsx`.
+- **Done when** : ✅ un compte `@wefiit.com` reçoit un lien, se connecte et atteint `/` ; une adresse externe est refusée avant envoi et re-bloquée au callback. (Garde de route testée : `/` et `/session/new` → `/login` ; `/login` → 200.)
 
-> 💡 **Fallback** si le setup Azure bloque en 2h : basculer temporairement sur un magic-link Supabase pour ne pas bloquer les phases 2-4, et rebrancher Azure après. (Décidé : Azure reste la cible.)
+### Étape 1.3 — (Reporté) SSO Microsoft / Azure — 🔜 post-V1
+- **Objectif** : remplacer le magic-link par le SSO Entra ID quand les droits Azure sont dispo.
+- **Actions** :
+  - App registration Azure (single-tenant WeFiiT), redirect URL Supabase, secret.
+  - Activer le provider **Azure** dans Supabase (client ID + secret + tenant).
+  - Page login : bouton "Se connecter avec Microsoft" → `signInWithOAuth({ provider: 'azure' })`.
+- **Fichiers impactés** : `app/login/page.tsx` (uniquement) + config Supabase/Azure. `proxy.ts`, `lib/supabase/server.ts` et le callback restent inchangés (déjà agnostiques).
+- **Done when** : un compte `@wefiit.com` se connecte via Microsoft, un compte externe est refusé par le tenant.
 
 ---
 
@@ -212,7 +224,7 @@
 ## ✅ Definition of Done (V1)
 
 Un WeFiiTer `@wefiit.com` peut, de bout en bout :
-1. Se connecter en SSO Microsoft.
+1. Se connecter via **magic-link e-mail** (SSO Microsoft reporté post-V1).
 2. Coller son brief + la spec client et démarrer une session.
 3. Pitcher à voix haute (transcrit en direct).
 4. Répondre oralement à 3 questions d'un client sceptique.
@@ -225,6 +237,7 @@ Un WeFiiTer `@wefiit.com` peut, de bout en bout :
 
 ## 🔭 Hors scope V1 (backlog V2)
 
+- **SSO Microsoft 365 / Azure AD** (remplace le magic-link — cf. Étape 1.3).
 - Upload/parsing PDF du brief et de la spec.
 - Conversation vocale temps réel (interruptions, streaming).
 - Transcription haute fidélité (Whisper / audio natif Claude).
@@ -240,7 +253,7 @@ Un WeFiiTer `@wefiit.com` peut, de bout en bout :
 | Risque | Mitigation |
 |--------|------------|
 | Web Speech API limité hors Chrome | Détecter le navigateur, recommander Chrome, prévoir saisie texte de secours. |
-| Setup Azure SSO long | Fallback magic-link Supabase pour ne pas bloquer, rebrancher Azure ensuite. |
+| Setup Azure SSO long | ✅ Traité : V1 sur **magic-link Supabase** ; Azure reporté post-V1 (Étape 1.3). Limite e-mail intégré Supabase ~3-4/h + risque spam → OK pour démo. |
 | Latence Claude (questions/débrief) | Écrans de chargement + `claude-sonnet-5` ; streaming en option. |
 | Clé Claude exposée | Tous les appels Claude via API routes serveur, jamais côté client. |
 | Accents fr / transcription imparfaite | Langue `fr-FR`, transcript éditable avant validation. |
